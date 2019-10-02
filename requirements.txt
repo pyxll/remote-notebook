@@ -1,0 +1,5 @@
+jupyter_client >= 5.3.3
+requests >= 2.22.0
+websockets >= 8.0.2
+aiohttp >= 3.6.1
+

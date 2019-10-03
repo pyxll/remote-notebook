@@ -57,7 +57,7 @@ class Kernel:
 
         # get the websockets channel
         ws_uri = self.__ws_base_url + f"/api/kernels/{kernel_id}/channels?session_id=" + self.__session_id
-        self.__ws = await websockets.connect(ws_uri, extra_headers=self.__headers)
+        self.__ws = await websockets.connect(ws_uri, max_size=None, extra_headers=self.__headers)
 
         # start polling the websocket connection
         loop = asyncio.get_event_loop()

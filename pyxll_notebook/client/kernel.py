@@ -25,17 +25,19 @@ class Kernel:
     default_handler_cls = Handler
     message_protocol_version = "5.0"
 
-    def __init__(self, host, port=8888, protocol='http', headers={}, handler=None):
+    def __init__(self, host, path="", port=None, protocol="http", headers={}, handler=None):
         """Kernel wrapper for running code on a notebook server."""
         if handler is None:
             handler = self.default_handler_cls(self)
+        port = f":{port}" if port else ""
+        path = f"/{path}" if path and not path.startswith("/") else path or ""
         self.__handler = handler
         self.__kernel = None
         self.__ws = None
         self.__session_id = uuid.uuid1().hex
         self.__username = os.getlogin()
-        self.__base_url = f"{protocol}://{host}:{port}"
-        self.__ws_base_url = f"ws://{host}:{port}"
+        self.__base_url = f"{protocol}://{host}{port}{path}"
+        self.__ws_base_url = f"ws://{host}{port}{path}"
         self.__kernel_url = None
         self.__headers = headers
         self.__message_events: Dict[str, MessageReplyEvent] = {}
@@ -45,7 +47,9 @@ class Kernel:
         kernels_url = self.__base_url + "/api/kernels"
         async with aiohttp.ClientSession() as session:
             async with session.post(kernels_url, headers=self.__headers) as response:
-                kernel = json.loads(await response.text())
+                await response.read()
+                response.raise_for_status()
+                kernel = await response.json()
                 if not "id" in kernel:
                     raise KernelStartError(kernel.get("message"))
                 kernel_id = kernel["id"]

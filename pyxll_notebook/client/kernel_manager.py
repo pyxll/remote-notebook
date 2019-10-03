@@ -27,8 +27,22 @@ class KernelManager:
         await self.stop_all_kernels()
 
         cfg = get_config()
-        host = cfg.get("NOTEBOOK", "host", fallback="localhost")
-        port = int(cfg.get("NOTEBOOK", "port", fallback=8888))
+        host = cfg.get("NOTEBOOK", "server", fallback="https://localhost:8888")
+
+        protocol = "http"
+        port = None
+        path = None
+        if "://" in host:
+            idx = host.find("://")
+            protocol, host = host[:idx], host[idx+3:]
+
+        if "/" in host:
+            host, path = host.split("/", 1)
+
+        if ":" in host:
+            host, port = host.split(":", 1)
+            port = int(port)
+
         auth_token = cfg.get("NOTEBOOK", "auth_token", fallback=None)
         notebooks = cfg.get("NOTEBOOK", "notebooks", fallback="")
         notebooks = [x for x in map(str.strip, notebooks.split(";")) if x]
@@ -39,7 +53,7 @@ class KernelManager:
             headers["Authorization"] = f"Token {auth_token}"
 
         for notebook in notebooks:
-            kernel = Kernel(host, port, headers=headers)
+            kernel = Kernel(host, protocol=protocol, port=port, path=path, headers=headers)
             self.__kernels.append(kernel)
             await kernel.start()
             await kernel.run_notebook(notebook)

@@ -4,6 +4,7 @@ kernels for each notebook in the configuration.
 """
 from pyxll import get_config
 from .kernel import Kernel
+from . import authenticators
 import asyncio
 
 
@@ -27,33 +28,29 @@ class KernelManager:
         await self.stop_all_kernels()
 
         cfg = get_config()
-        host = cfg.get("NOTEBOOK", "server", fallback="https://localhost:8888")
-
-        protocol = "http"
-        port = None
-        path = None
-        if "://" in host:
-            idx = host.find("://")
-            protocol, host = host[:idx], host[idx+3:]
-
-        if "/" in host:
-            host, path = host.split("/", 1)
-
-        if ":" in host:
-            host, port = host.split(":", 1)
-            port = int(port)
-
-        auth_token = cfg.get("NOTEBOOK", "auth_token", fallback=None)
+        url = cfg.get("NOTEBOOK", "url", fallback="https://localhost:8888")
         notebooks = cfg.get("NOTEBOOK", "notebooks", fallback="")
         notebooks = [x for x in map(str.strip, notebooks.split(";")) if x]
 
-        # load each notebook in a new kernel
-        headers = {}
-        if auth_token:
-            headers["Authorization"] = f"Token {auth_token}"
+        # get the authenticator
+        auth = None
+        auth_class = cfg.get("NOTEBOOK", "auth_class")
+        if auth_class:
+            cls = getattr(authenticators, auth_class, None)
+            if cls is None:
+                package, cls_name = auth_class.rsplit(".", 1)
+                module = __import__(package, fromlist=[cls_name])
+                cls = getattr(module, cls_name, None)
+            if cls is None:
+                raise AssertionError(f"Authentication class '{auth_class}' not found.")
+
+            kwargs = dict(cfg["NOTEBOOK"])
+            kwargs["url"] = url
+            kwargs["notebooks"] = notebooks
+            auth = cls(**kwargs)
 
         for notebook in notebooks:
-            kernel = Kernel(host, protocol=protocol, port=port, path=path, headers=headers)
+            kernel = Kernel(url, authenticator=auth)
             self.__kernels.append(kernel)
             await kernel.start()
             await kernel.run_notebook(notebook)

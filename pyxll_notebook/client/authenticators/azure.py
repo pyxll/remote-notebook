@@ -6,7 +6,10 @@ from functools import partial
 import aiohttp.cookiejar
 import asyncio
 import logging
+import pickle
+import pyxll
 import sys
+import os
 
 _log = logging.getLogger(__name__)
 
@@ -15,13 +18,34 @@ class AzureAuthenticator:
 
     notebooks_url = "https://notebooks.azure.com"
 
-    def __init__(self, notebooks, azure_user_id=None, azure_project=None, **kwargs):
+    def __init__(self, notebooks, azure_user_id=None, azure_project=None, azure_cookie_jar=None, **kwargs):
         if not azure_user_id and azure_project:
             raise AssertionError("azure_user_id and azure_project must be specified.")
         self.__notebooks = notebooks
         self.__user_id = azure_user_id
         self.__project = azure_project
         self.__cookies = {}
+        self.__azure_cookie_jar = self.__get_abs_path(azure_cookie_jar)
+        self.__load_cookies()
+
+    @staticmethod
+    def __get_abs_path(path):
+        # We don't know the config file name so use the location of the pyxll.xll file
+        if path and not os.path.isabs(path):
+            return os.path.join(os.path.dirname(pyxll.__file__), path)
+        return path
+
+    def __load_cookies(self):
+        if self.__azure_cookie_jar and os.path.exists(self.__azure_cookie_jar):
+            with open(self.__azure_cookie_jar, "rb") as fh:
+                _log.debug(f"Loading Azure cookies from {self.__azure_cookie_jar}")
+                self.__cookies.update(pickle.load(fh))
+
+    def __save_cookies(self):
+        if self.__azure_cookie_jar:
+            _log.debug(f"Saving Azure cookies to {self.__azure_cookie_jar}")
+            with open(self.__azure_cookie_jar, "wb") as fh:
+                pickle.dump(self.__cookies, fh)
 
     @property
     def __notebook_url(self):
@@ -54,47 +78,65 @@ class AzureAuthenticator:
             _log.debug("Got authentication token from Azure.")
             got_auth_event.set()
 
+    def __update_cookie_store(self, cookie_store):
+        from PyQt5.QtNetwork import QNetworkCookie
+        from PyQt5.QtCore import QByteArray
+
+        for key, cookie in self.__cookies.items():
+            # Skip the auth token as we'll get it again after a successful login
+            if key == "_xsrf":
+                continue
+
+            # Add the cookie to store
+            value = str(cookie)
+            if ":" in value:
+                value = value.split(":", 1)[1].strip()
+            for morsel in QNetworkCookie.parseCookies(QByteArray(value.encode("utf-8"))):
+                cookie_store.setCookie(morsel)
+
     def _login(self, queue=None):
-        from PyQt5.QtWidgets import QApplication
-        from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile, QWebEnginePage
-        from PyQt5.QtCore import QEventLoop, QUrl
+        try:
+            from PyQt5.QtWidgets import QApplication
+            from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile, QWebEnginePage
+            from PyQt5.QtCore import QEventLoop, QUrl
 
-        app = QApplication(sys.argv)
-        browser = QWebEngineView()
-        profile = QWebEngineProfile()
-        page = QWebEnginePage(profile, browser)
+            app = QApplication(sys.argv)
+            browser = QWebEngineView()
+            profile = QWebEngineProfile()
+            page = QWebEnginePage(profile, browser)
 
-        loop = asyncio.get_event_loop()
-        browser_closed_event = asyncio.Event(loop=loop)
-        page.windowCloseRequested.connect(lambda event: browser_closed_event.set())
+            loop = asyncio.get_event_loop()
+            browser_closed_event = asyncio.Event(loop=loop)
+            page.windowCloseRequested.connect(lambda event: browser_closed_event.set())
 
-        # whenever a page finishes loading, look for the login button
-        page.loadFinished.connect(partial(self.__on_page_loaded, page))
+            # whenever a page finishes loading, look for the login button
+            page.loadFinished.connect(partial(self.__on_page_loaded, page))
 
-        # keep track of cookies
-        cookies = profile.cookieStore()
-        got_auth_event = asyncio.Event(loop=loop)
-        cookies.cookieAdded.connect(partial(self.__on_cookie_added, got_auth_event))
+            # keep track of cookies
+            cookies = profile.cookieStore()
+            self.__update_cookie_store(cookies)
+            got_auth_event = asyncio.Event(loop=loop)
+            cookies.cookieAdded.connect(partial(self.__on_cookie_added, got_auth_event))
 
-        # navigate to the notebook and show the browser
-        page.setUrl(QUrl(self.__notebook_url))
-        browser.setPage(page)
-        browser.show()
+            # navigate to the notebook and show the browser
+            page.setUrl(QUrl(self.__notebook_url))
+            browser.setPage(page)
+            browser.show()
 
-        # process Qt events until we've got the token or the browser is closed
-        async def poll():
-            future = asyncio.gather(got_auth_event.wait(), browser_closed_event.wait())
-            while not got_auth_event.is_set() and not browser_closed_event.is_set():
-                app.processEvents(QEventLoop.AllEvents, 300)
-                await asyncio.wait([future], loop=loop, timeout=0)
+            # process Qt events until we've got the token or the browser is closed
+            async def poll():
+                future = asyncio.gather(got_auth_event.wait(), browser_closed_event.wait())
+                while not got_auth_event.is_set() and not browser_closed_event.is_set():
+                    app.processEvents(QEventLoop.AllEvents, 300)
+                    await asyncio.wait([future], loop=loop, timeout=0)
 
-        loop.run_until_complete(poll())
+            loop.run_until_complete(poll())
 
-        if not got_auth_event.is_set():
-            raise AuthenticationError()
-
-        if queue:
-            queue.put(self.__cookies)
+            if not got_auth_event.is_set():
+                raise AuthenticationError()
+        finally:
+            if queue:
+                queue.put(self.__cookies)
 
     async def login(self):
         """Present a browser to the user to login to azure."""
@@ -105,6 +147,8 @@ class AzureAuthenticator:
         p.start()
         self.__cookies.update(q.get())
         p.join()
+
+        self.__save_cookies()
 
     async def authenticate(self):
         await self.login()

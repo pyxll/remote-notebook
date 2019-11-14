@@ -1,0 +1,43 @@
+<!--
+This is an example ribbon file containing some buttons that can be used
+with the PyXLL Jupyter Notebook project.
+
+You should take this, adapt it, and add it to your own ribbon file.
+-->
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui"
+          onLoad="pyxll_notebook.client.ribbon.on_load">
+    <ribbon>
+        <tabs>
+            <tab id="pyxll.notebooks.tab" label="Jupyter">
+                <group id="pyxll.connections" label="Connection">
+                    <button id="pyxll.notebooks.start_kernels"
+                            size="large"
+                            label="Start Jupyter Kernels"
+                            onAction="pyxll_notebook.client.ribbon.start_kernels"
+                            getImage="pyxll_notebook.client.ribbon.get_image"/>
+                    <button id="pyxll.notebooks.stop_kernels"
+                            size="large"
+                            label="Stop Jupyter Kernels"
+                            onAction="pyxll_notebook.client.ribbon.stop_kernels"
+                            getImage="pyxll_notebook.client.ribbon.get_image"/>
+                </group>
+                <group id="pyxll.notebooks" label="Notebooks">
+                    <comboBox id="pyxll.notebooks.selected_notebook"
+                              label="Notebook"
+                              onChange="pyxll_notebook.client.ribbon.notebook_changed"
+                              getItemCount="pyxll_notebook.client.ribbon.notebook_count"
+                              getItemLabel="pyxll_notebook.client.ribbon.notebook_label"
+                              getText="pyxll_notebook.client.ribbon.notebook_current"/>
+                    <button id="pyxll.notebooks.run_notebook"
+                            size="normal"
+                            label="Run Notebook"
+                            onAction="pyxll_notebook.client.ribbon.run_notebook"/>
+                    <button id="pyxll.notebooks.refresh_notebooks"
+                            size="normal"
+                            label="Refresh List"
+                            onAction="pyxll_notebook.client.ribbon.refresh_notebooks"/>
+                </group>
+            </tab>
+        </tabs>
+    </ribbon>
+</customUI>

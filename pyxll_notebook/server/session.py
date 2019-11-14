@@ -1,16 +1,21 @@
 from ipykernel.kernelapp import IPKernelApp
-from functools import lru_cache
+
+_session = None
 
 
-@lru_cache(maxsize=None)
 def get_session():
     """Return the session id of the owner PyXLL client, or None."""
+    global _session
+    if _session is not None:
+        return _session
+
     app = IPKernelApp.instance()
     if app is None:
         return None
 
     user_ns = app.shell.user_ns
-    return user_ns.get("__pyxll_notebook_session__")
+    _session = user_ns.get("__pyxll_notebook_session__")
+    return _session
 
 
 def send_message(msg_type, content):

@@ -156,7 +156,7 @@ class Kernel:
         content = reply.get("content", {})
         status = content.get("status")
         if status != "ok":
-            raise ExecuteRequestError(**reply)
+            raise ExecuteRequestError(**content)
 
         return content
 

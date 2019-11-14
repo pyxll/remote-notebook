@@ -8,7 +8,9 @@ class KernelStartError(RuntimeError):
 
 
 class ExecuteRequestError(RuntimeError):
-    def __init__(self, evalue, **kwargs):
+    def __init__(self, evalue=None, traceback=None, **kwargs):
+        if evalue is None:
+            evalue = str(kwargs)
         super().__init__(evalue)
 
 

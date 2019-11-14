@@ -57,7 +57,8 @@ def xl_func(signature=None,
             _registered_xl_funcs[xl_name] = func
 
             # register the function on the client
-            spec = inspect.getfullargspec(func)
+            getargspec = inspect.getfullargspec if hasattr(inspect, "getfullargspec") else inspect.getargspec
+            spec = getargspec(func)
             msg = {
                 "func": func.__name__,
                 "args": spec.args,

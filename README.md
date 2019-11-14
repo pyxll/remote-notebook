@@ -3,8 +3,10 @@
 
 This project bridges PyXLL and Jupyter Notebooks.
 
-Simply, it enables Excel add-ins to be written in Python using PyXLL, but for the
-Python code to be executed in an IPython kernel running on a Jupyter Notebook server.
+It enables Excel add-ins to be written in Python using PyXLL, but for the  Python code
+to be executed in an IPython kernel running on a Jupyter Notebook server.
+
+For details about PyXLL, see https://www.pyxll.com.
 
 ## Status
 

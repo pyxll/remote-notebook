@@ -5,7 +5,7 @@ client to talk to the notebook server.
 It should be included in the pyxll.cfg list of modules, and configured
 in the [NOTEBOOK] section of the config.
 """
-from pyxll import get_event_loop, xl_on_open, xl_on_reload, xl_on_close, xl_menu
+from pyxll import get_event_loop, xl_on_open, xl_on_reload, xl_on_close, xl_menu, get_config, xlcAlert
 from .kernel import Kernel
 from .handler import Handler
 from pyxll_notebook.errors import KernelStartError, ExecuteRequestError
@@ -22,16 +22,18 @@ __all__ = [
 ]
 
 
-
 @xl_on_open
 @xl_on_reload
 def on_open(import_info):
     """Start the remote kernel when Excel starts up, or PyXLL is reloaded.
     """
-    km = KernelManager.instance()
-    loop = get_event_loop()
-    f = asyncio.run_coroutine_threadsafe(km.start_all_kernels(), loop)
-    f.result()
+    cfg = get_config()
+    start_on_open = bool(int(cfg.get("NOTEBOOK", "start_on_open", fallback=0)))
+    if start_on_open:
+        km = KernelManager.instance()
+        loop = get_event_loop()
+        f = asyncio.run_coroutine_threadsafe(km.start_all_kernels(), loop)
+        f.result()
 
 
 @xl_on_close
@@ -45,3 +47,23 @@ def on_close():
     loop = get_event_loop()
     f = asyncio.run_coroutine_threadsafe(km.stop_all_kernels(), loop)
     f.result()
+
+
+@xl_menu("Start Jupyter kernel", menu="Jupyter Notebooks")
+def start_kernels():
+    """Starts the remote Jupyter kernels"""
+    km = KernelManager.instance()
+    loop = get_event_loop()
+    f = asyncio.run_coroutine_threadsafe(km.start_all_kernels(), loop)
+    f.result()
+    xlcAlert("Jupyter kernel started")
+
+
+@xl_menu("Stop Jupyter kernel", menu="Jupyter Notebooks")
+def stop_kernels():
+    """Starts the remote Jupyter kernels"""
+    km = KernelManager.instance()
+    loop = get_event_loop()
+    f = asyncio.run_coroutine_threadsafe(km.stop_all_kernels(), loop)
+    f.result()
+    xlcAlert("Jupyter kernel stopped")

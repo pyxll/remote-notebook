@@ -27,12 +27,7 @@ class Kernel:
     default_handler_cls = Handler
     message_protocol_version = "5.0"
 
-    def __init__(self,
-                 url=None,
-                 headers=None,
-                 cookies=None,
-                 handler=None,
-                 authenticator=None):
+    def __init__(self, url, authenticator, handler=None):
         """Kernel wrapper for running code on a notebook server."""
         if handler is None:
             handler = self.default_handler_cls(self)
@@ -44,10 +39,6 @@ class Kernel:
         self.__username = os.getlogin()
         self.__kernel_url = None
         self.__ws_url = None
-        self.__headers = dict(headers or {})
-        self.__cookie_jar = aiohttp.cookiejar.CookieJar()
-        if cookies:
-            self.__cookie_jar.update_cookies(cookies)
         self.__authenticator = authenticator
         self.__message_events: Dict[str, MessageReplyEvent] = {}
 
@@ -57,24 +48,18 @@ class Kernel:
         url = self.__url
         ws_url = None
 
-        if self.__authenticator:
-            auth = await self.__authenticator.authenticate()
-            headers = auth.get("headers")
-            if headers:
-                self.__headers.update(headers)
-
-            cookies = auth.get("cookies")
-            if cookies:
-                self.__cookie_jar.update_cookies(cookies)
-
-            url = auth.get("url", url)
-            ws_url = auth.get("url", ws_url)
+        if not self.__authenticator.authenticated:
+            await self.__authenticator.authenticate()
 
         kernels_url = url + "/api/kernels"
-        async with aiohttp.ClientSession(cookie_jar=self.__cookie_jar) as session:
-            async with session.post(kernels_url, headers=self.__headers) as response:
-                await response.read()
-                response.raise_for_status()
+        async with aiohttp.ClientSession(cookie_jar=self.__authenticator.cookie_jar) as session:
+            async with session.post(kernels_url, headers=self.__authenticator.headers) as response:
+                try:
+                    await response.read()
+                    response.raise_for_status()
+                except Exception:
+                    self.__authenticator.reset()
+                    raise
 
                 # If the status code is 200 and the response isn't json it's not, the most likely
                 # cause is the notebook server isn't running but the web-server is returning a restart
@@ -100,8 +85,8 @@ class Kernel:
             port = f":{u.port}" if u.port else ""
             ws_url = f"{scheme}://{u.hostname}{port}{u.path}"
 
-        ws_headers = dict(self.__headers)
-        cookies = self.__cookie_jar.filter_cookies(kernels_url)
+        ws_headers = dict(self.__authenticator.headers)
+        cookies = self.__authenticator.cookie_jar.filter_cookies(kernels_url)
         cookies = [f"{k}={c.value};" for k, c in cookies.items()]
         ws_headers["Cookie"] = " ".join(cookies)
         self.__ws_url = f"{ws_url}/api/kernels/{kernel_id}/channels?session_id={self.__session_id}"
@@ -114,11 +99,15 @@ class Kernel:
     async def run_notebook(self, path):
         """Run all cells in a notebook"""
         url = self.__url + "/api/contents/" + path
-        async with aiohttp.ClientSession(cookie_jar=self.__cookie_jar) as session:
-            async with session.get(url, headers=self.__headers) as response:
-                await response.read()
-                response.raise_for_status()
-                file = await response.json()
+        async with aiohttp.ClientSession(cookie_jar=self.__authenticator.cookie_jar) as session:
+            async with session.get(url, headers=self.__authenticator.headers) as response:
+                try:
+                    await response.read()
+                    response.raise_for_status()
+                    file = await response.json()
+                except Exception:
+                    self.__authenticator.reset()
+                    raise
 
         # set the special __pyxll_notebook_session__ variable
         await self.execute(f"__pyxll_notebook_session__ = '{self.__session_id}'")
@@ -217,7 +206,7 @@ class Kernel:
         """Sends the shutdown command to the kernel and closes the websocket connection"""
         kernel_url = self.__kernel_url
         kernel = self.__kernel
-        headers = self.__headers
+        auth = self.__authenticator
         ws = self.__ws
 
         self.__kernel = None
@@ -228,12 +217,17 @@ class Kernel:
             if ws:
                 tasks.append(ws.close())
 
-            async with aiohttp.ClientSession() as session:
-                async with session.delete(kernel_url, headers=headers) as response:
-                    tasks.append(response.read())
-                    await asyncio.gather(*tasks)
+            async with aiohttp.ClientSession(cookie_jar=auth.cookie_jar) as session:
+                async with session.delete(kernel_url, headers=auth.headers) as response:
+                    try:
+                        tasks.append(response.read())
+                        await asyncio.gather(*tasks)
+                    except Exception:
+                        auth.reset()
+                        raise
                     _log.debug(f"Shutdown kernel {kernel['id']}")
 
     def __del__(self):
         if self.__kernel:
             _log.warning("Kernel not shutdown cleanly")
+

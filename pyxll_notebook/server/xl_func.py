@@ -5,17 +5,18 @@ from .session import get_session, send_message
 from ..serialization import serialize_args, deserialize_args, serialize_result
 from ipykernel.kernelapp import IPKernelApp
 import inspect
+import pickle
 
 
 _registered_xl_funcs = {}
 
 
-def _call_xl_func(func_name, args):
+def _call_xl_func(func_name, args, protocol=pickle.HIGHEST_PROTOCOL):
     """Called from the client to invoke a registered xl_func"""
     func = _registered_xl_funcs[func_name]
     args = deserialize_args(args)
     result = func(*args)
-    return serialize_result(result)
+    return serialize_result(result, protocol=min(protocol, pickle.HIGHEST_PROTOCOL))
 
 
 def xl_func(signature=None,
@@ -64,6 +65,7 @@ def xl_func(signature=None,
                 "args": spec.args,
                 "varargs": spec.varargs,
                 "defaults": serialize_args(spec.defaults) if spec.defaults else None,
+                "pickle_protocol": pickle.HIGHEST_PROTOCOL,
                 "doc": func.__doc__,
                 "signature": signature,
                 "category": category,

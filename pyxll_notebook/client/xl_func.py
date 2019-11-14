@@ -9,6 +9,7 @@ from ..serialization import serialize_args, deserialize_args, deserialize_result
 from ..errors import ExecuteRequestError
 from functools import wraps
 from itertools import chain
+import pickle
 import asyncio
 
 
@@ -17,6 +18,7 @@ def bind_xl_func(kernel, func_name, **kwargs):
     xl_name = kwargs.get("name", func_name)
     args = kwargs.pop("args", None) or []
     varargs = kwargs.pop("varargs", None)
+    pickle_protocol = min(kwargs.pop("pickle_protocol", pickle.HIGHEST_PROTOCOL), pickle.HIGHEST_PROTOCOL)
     defaults = kwargs.pop("defaults", None) or []
     if defaults:
         defaults = deserialize_args(defaults)
@@ -43,8 +45,8 @@ def bind_xl_func(kernel, func_name, **kwargs):
     @wraps(dummy_func)
     def wrapper_function(*args):
         async def call_remote_function(args):
-            args = serialize_args(args)
-            expr = f"__pyxll_notebook_call_xl_func('{xl_name}', '{args}')"
+            args = serialize_args(args, protocol=pickle_protocol)
+            expr = f"__pyxll_notebook_call_xl_func('{xl_name}', '{args}', protocol={pickle.HIGHEST_PROTOCOL})"
             reply = await kernel.execute('', user_expressions={"result": expr})
 
             result = reply["user_expressions"]["result"]

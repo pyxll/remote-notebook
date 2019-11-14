@@ -9,10 +9,13 @@ import pickle
 import base64
 
 
-def serialize_args(args):
+def serialize_args(args, protocol=pickle.HIGHEST_PROTOCOL):
     """serialize a tuple of args to an escaped string"""
-    data = pickle.dumps(args)
-    return base64.b64encode(data).decode()
+    data = pickle.dumps(args, protocol=protocol)
+    encoded = base64.b64encode(data).decode()
+    if not isinstance(encoded, str):
+        encoded = str(encoded)
+    return encoded
 
 
 def deserialize_args(args):
@@ -20,10 +23,13 @@ def deserialize_args(args):
     return pickle.loads(data)
 
 
-def serialize_result(result):
+def serialize_result(result, protocol=pickle.HIGHEST_PROTOCOL):
     """serialize result from a Python function to send to the client"""
-    data = pickle.dumps(result)
-    return base64.b64encode(data).decode()
+    data = pickle.dumps(result, protocol=protocol)
+    encoded = base64.b64encode(data).decode()
+    if not isinstance(encoded, str):
+        encoded = str(encoded)
+    return encoded
 
 
 def deserialize_result(result):

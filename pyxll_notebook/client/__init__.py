@@ -8,7 +8,7 @@ in the [NOTEBOOK] section of the config.
 from pyxll import get_event_loop, xl_on_open, xl_on_reload, xl_on_close, xl_menu, get_config, xlcAlert
 from .kernel import Kernel
 from .handler import Handler
-from pyxll_notebook.errors import KernelStartError, ExecuteRequestError
+from ..errors import KernelStartError, ExecuteRequestError
 from .kernel_manager import KernelManager
 import asyncio
 

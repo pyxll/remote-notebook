@@ -25,5 +25,9 @@ setuptools.setup(
     zip_safe=False,
     package_data={
         "": ["*.cfg", "*.xml", "*.png"],
+    },
+    extras_require={
+        "client":  ["websockets", "aiohttp"],
+        "server": ["ipykernel"],
     }
 )

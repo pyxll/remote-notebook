@@ -1,16 +1,15 @@
 """
 @xl_func decorator equivalent for registering remote notebook functions.
 """
-from .session import get_session, send_message
+from .session import get_session, send_message, register_server_function
 from ..serialization import serialize_args, deserialize_args, serialize_result
-from ipykernel.kernelapp import IPKernelApp
 import inspect
 import pickle
-
 
 _registered_xl_funcs = {}
 
 
+@register_server_function("__pyxll_notebook_call_xl_func")
 def _call_xl_func(func_name, args, protocol=pickle.HIGHEST_PROTOCOL):
     """Called from the client to invoke a registered xl_func"""
     func = _registered_xl_funcs[func_name]
@@ -50,10 +49,6 @@ def xl_func(signature=None,
         xl_name = name or func.__name__
         session = get_session()
         if session:
-            # Add __pyxll_notebook_call_xl_func to user_ns
-            app = IPKernelApp.instance()
-            app.shell.user_ns.setdefault("__pyxll_notebook_call_xl_func", _call_xl_func)
-
             # func will be called via _call_xl_func from the client
             _registered_xl_funcs[xl_name] = func
 
@@ -80,7 +75,7 @@ def xl_func(signature=None,
                 "auto_resize": auto_resize,
                 "hidden": hidden
             }
-            send_message("xl_func", msg)
+            send_message(session, "xl_func", msg)
 
         return func
 

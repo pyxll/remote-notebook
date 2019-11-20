@@ -5,6 +5,8 @@ bind_xl_func is called from the Kernel handler in response to a "pyxll.xl_func"
 message from the server.
 """
 import pyxll
+from .rtd import create_client_rtd
+from ..server.rtd import RTD
 from ..serialization import serialize_args, deserialize_args, deserialize_result
 from ..errors import ExecuteRequestError
 from functools import wraps
@@ -55,7 +57,10 @@ def bind_xl_func(kernel, func_name, **kwargs):
                 raise ExecuteRequestError(**result)
 
             data = result["data"]["text/plain"]
-            return deserialize_result(data)
+            result = deserialize_result(data)
+            if isinstance(result, RTD):
+                result = create_client_rtd(kernel, result, pickle_protocol)
+            return result
 
         loop = pyxll.get_event_loop()
         f = asyncio.run_coroutine_threadsafe(call_remote_function(args), loop)

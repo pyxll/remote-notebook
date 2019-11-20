@@ -12,6 +12,7 @@ import websockets
 import logging
 import aiohttp
 import asyncio
+import pickle
 import json
 import uuid
 import os
@@ -109,8 +110,9 @@ class Kernel:
                     self.__authenticator.reset()
                     raise
 
-        # set the special __pyxll_notebook_session__ variable
+        # set the special __pyxll_notebook_session__ and __pyxll_pickle_protocol__ variables
         await self.execute(f"__pyxll_notebook_session__ = '{self.__session_id}'")
+        await self.execute(f"__pyxll_pickle_protocol__ = {pickle.HIGHEST_PROTOCOL}")
 
         cells = file["content"]["cells"]
         code = [c["source"] for c in cells if len(c["source"]) > 0 and c["cell_type"] == "code"]

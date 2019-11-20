@@ -18,6 +18,10 @@ This project is currently a proof of concept, and so lots of things are missing.
     Excel functions in a remote Jupyter notebook decorated with @xl_func can be used from Excel in
     the same way as if they were being run locally.
 
+- RTD functions (RTD):
+    Functions in remote Jupyter notebooks decorated with @xl_func can return RTD instances, and
+    setting the RTD value in the Jupyter notebook updates the value in Excel.
+
 ### What's not working yet
 
 - Cached objects
@@ -25,7 +29,6 @@ This project is currently a proof of concept, and so lots of things are missing.
 - Macros
 - Menus
 - Ribbon functions
-- RTD functions
 - Excel C wrapper functions
 - Custom types
 - ...probably much more

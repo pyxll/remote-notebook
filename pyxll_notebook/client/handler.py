@@ -2,6 +2,8 @@
 Handler for websocket messages received by the client.
 """
 from .xl_func import bind_xl_func
+from .rtd import xl_rtd_set_value, xl_rtd_set_error
+from ..serialization import deserialize_args
 import weakref
 import logging
 import sys
@@ -42,3 +44,45 @@ class Handler:
             raise AssertionError("xl_func message received with no function name")
 
         bind_xl_func(self.__kernel, func_name, **kwargs)
+
+    @staticmethod
+    async def on_xl_rtd_set_value(msg):
+        content = msg.get("content")
+        if not content:
+            raise AssertionError("xl_rtd_set_value message received with no content")
+
+        kwargs = dict(content)
+        id = kwargs.pop("id", None)
+        if not id:
+            raise AssertionError("xl_rtd_set_value message received with no id")
+
+        args = kwargs.pop("args", ())
+        if args:
+            args = deserialize_args(args)
+
+        kwargs = kwargs.pop("kwargs", {})
+        if kwargs:
+            kwargs = deserialize_args(kwargs)
+
+        xl_rtd_set_value(id, *args, **kwargs)
+
+    @staticmethod
+    async def on_xl_rtd_set_error(msg):
+        content = msg.get("content")
+        if not content:
+            raise AssertionError("xl_rtd_set_error message received with no content")
+
+        kwargs = dict(content)
+        id = kwargs.pop("id", None)
+        if not id:
+            raise AssertionError("xl_rtd_set_error message received with no id")
+
+        args = kwargs.pop("args", ())
+        if args:
+            args = deserialize_args(args)
+
+        kwargs = kwargs.pop("kwargs", {})
+        if kwargs:
+            kwargs = deserialize_args(kwargs)
+
+        xl_rtd_set_error(id, *args, **kwargs)

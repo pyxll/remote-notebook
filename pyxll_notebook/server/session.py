@@ -1,4 +1,7 @@
-from ipykernel.kernelapp import IPKernelApp
+try:
+    from ipykernel.kernelapp import IPKernelApp
+except ImportError:
+    IPKernelApp = None
 
 _session = None
 
@@ -9,7 +12,7 @@ def get_session():
     if _session is not None:
         return _session
 
-    app = IPKernelApp.instance()
+    app = IPKernelApp.instance() if IPKernelApp else None
     if app is None:
         return None
 
@@ -18,13 +21,12 @@ def get_session():
     return _session
 
 
-def send_message(msg_type, content):
+def send_message(session, msg_type, content):
     """Sends a message back to the client."""
-    app = IPKernelApp.instance()
+    app = IPKernelApp.instance() if IPKernelApp else None
     if app is None:
         raise AssertionError("No IPKernelApp found.")
 
-    session = get_session()
     if session is None:
         raise AssertionError("No PyXLL client session found.")
 
@@ -38,3 +40,14 @@ def send_message(msg_type, content):
                      msg_type,
                      content=content,
                      parent=parent)
+
+
+def register_server_function(name):
+    """Registers a function that can be called from the client"""
+    def make_decorator(name):
+        def decorator(func):
+            app = IPKernelApp.instance() if IPKernelApp else None
+            if app and app.shell:
+                app.shell.user_ns.setdefault(name, func)
+        return decorator
+    return make_decorator(name)

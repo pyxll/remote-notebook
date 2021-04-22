@@ -69,4 +69,3 @@ def bind_xl_func(kernel, func_name, **kwargs):
     wrapper_function.__name__ = func_name
 
     pyxll.xl_func(**kwargs)(wrapper_function)
-    pyxll.rebind()

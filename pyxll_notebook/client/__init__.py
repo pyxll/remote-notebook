@@ -67,3 +67,15 @@ def stop_kernels():
     f = asyncio.run_coroutine_threadsafe(km.stop_all_kernels(), loop)
     f.result()
     xlcAlert("Jupyter kernel stopped")
+
+
+@xl_menu("Restart Jupyter kernel", menu="Jupyter Notebooks")
+def restart_kernels():
+    """Starts the remote Jupyter kernels"""
+    km = KernelManager.instance()
+    loop = get_event_loop()
+    f = asyncio.run_coroutine_threadsafe(km.stop_all_kernels(), loop)
+    f.result()
+    f = asyncio.run_coroutine_threadsafe(km.start_all_kernels(), loop)
+    f.result()
+    xlcAlert("Jupyter kernel restarted")

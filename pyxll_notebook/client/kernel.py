@@ -52,12 +52,26 @@ class Kernel:
         if not self.__authenticator.authenticated:
             await self.__authenticator.authenticate()
 
+        # Do a GET request first to update the cookie jar with the _xsrf token
+        tree_url = url + "/tree"
+        async with aiohttp.ClientSession(cookie_jar=self.__authenticator.cookie_jar) as session:
+            async with session.get(tree_url, headers=self.__authenticator.headers) as response:
+                try:
+                    await response.read()
+                    response.raise_for_status()
+                    self.__authenticator.update_cookies(response.cookies, response_url=response.url)
+                except Exception:
+                    self.__authenticator.reset()
+                    raise
+
+        # Then do the POST request to start the new kernel
         kernels_url = url + "/api/kernels"
         async with aiohttp.ClientSession(cookie_jar=self.__authenticator.cookie_jar) as session:
             async with session.post(kernels_url, headers=self.__authenticator.headers) as response:
                 try:
                     await response.read()
                     response.raise_for_status()
+                    self.__authenticator.update_cookies(response.cookies, response_url=response.url)
                 except Exception:
                     self.__authenticator.reset()
                     raise
@@ -105,6 +119,7 @@ class Kernel:
                 try:
                     await response.read()
                     response.raise_for_status()
+                    self.__authenticator.update_cookies(response.cookies, response_url=response.url)
                     file = await response.json()
                 except Exception:
                     self.__authenticator.reset()
@@ -232,4 +247,3 @@ class Kernel:
     def __del__(self):
         if self.__kernel:
             _log.warning("Kernel not shutdown cleanly")
-

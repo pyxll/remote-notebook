@@ -16,7 +16,7 @@ class KernelManager:
         notebooks = cfg.get("NOTEBOOK", "notebooks", fallback="")
         self.__notebooks = [x for x in map(str.strip, notebooks.split(";")) if x]
         self.__url = cfg.get("NOTEBOOK", "url", fallback="https://localhost:8888")
-        self.__auth_class = cfg.get("NOTEBOOK", "auth_class")
+        self.__auth_class = cfg.get("NOTEBOOK", "auth_class", fallback="NoAuthAuthenticator")
         self.__cfg = cfg
         self.__authenticator = None
         self.__kernels = {}

@@ -39,10 +39,6 @@ class BrowserAuthenticator(Authenticator):
         """extra kwargs to use to create a clone not used by the base class."""
         return {}
 
-    def _auth_cookie_name(self):
-        """Name of the cookie to look for to confirm successful login."""
-        return "_xsrf"
-
     def _on_page_loaded(self, browser, *args):
         """Callback for when a page is loaded."""
         pass
@@ -74,28 +70,22 @@ class BrowserAuthenticator(Authenticator):
             with open(cookie_jar_path, "wb") as fh:
                 pickle.dump(self.__cookies, fh)
 
-    def __on_cookie_added(self, got_auth_event, auth_cookie_name, cookie):
+    def __on_cookie_added(self, got_auth_event, cookie):
         """Add cookies to our cookie jar."""
         key = cookie.name().data().decode()
         cookies = aiohttp.cookiejar.SimpleCookie(cookie.toRawForm().data().decode())
         self.__cookies[key] = cookies[key]
 
         # Once we've got the auth token we can stop
-        if key == auth_cookie_name:
+        if key == "_xsrf":
             _log.debug("Got authentication token.")
             got_auth_event.set()
 
     def __update_cookie_store(self, cookie_store):
         from .widgets.qtimports import QNetworkCookie, QByteArray
 
-        auth_cookie_name = self._auth_cookie_name()
+        # Add the cookies to the store
         for key, cookie in self.__cookies.items():
-            # Skip the auth token as we'll get it again after a successful login
-            if key == auth_cookie_name:
-                continue
-            print(f"{key} = {cookie}")
-
-            # Add the cookie to store
             value = str(cookie)
             if ":" in value:
                 value = value.split(":", 1)[1].strip()
@@ -125,8 +115,7 @@ class BrowserAuthenticator(Authenticator):
         cookies = browser.cookieStore()
         self.__update_cookie_store(cookies)
         got_auth_event = asyncio.Event(loop=loop)
-        auth_cookie_name = self._auth_cookie_name()
-        cookies.cookieAdded.connect(partial(self.__on_cookie_added, got_auth_event, auth_cookie_name))
+        cookies.cookieAdded.connect(partial(self.__on_cookie_added, got_auth_event))
 
         # navigate to the login page and show the browser
         url = self._login_url()
@@ -172,12 +161,7 @@ class BrowserAuthenticator(Authenticator):
 
     async def _authenticate(self):
         await self.login()
-        auth_cookie_name = self._auth_cookie_name()
         return {
-            "headers": {
-                "Accept": "application/json, text/javascript, */*; q=0.01",
-                "X-XSRFToken": self.__cookies[auth_cookie_name].value
-            },
             "cookies": self.__cookies
         }
 

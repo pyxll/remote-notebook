@@ -8,7 +8,9 @@ class Authenticator:
 
     def __init__(self):
         self.__cookie_jar = aiohttp.cookiejar.CookieJar()
-        self.__headers = {}
+        self.__headers = {
+            "Accept": "application/json, text/javascript, */*; q=0.01"
+        }
         self.__authenticated = False
 
     async def _authenticate(self):
@@ -24,12 +26,12 @@ class Authenticator:
         """Do any necessary authentication and update headers and cookie_jar.
         """
         auth = await self._authenticate()
-        headers = auth.get("headers")
         cookies = auth.get("cookies")
+        headers = auth.get("headers")
+        if cookies:
+            self.update_cookies(cookies)
         if headers:
             self.__headers.update(headers)
-        if cookies:
-            self.__cookie_jar.update_cookies(cookies)
         self.__authenticated = True
         return auth
 
@@ -43,6 +45,12 @@ class Authenticator:
         self.__cookie_jar = aiohttp.cookiejar.CookieJar()
         self.__headers = {}
         self.__authenticated = False
+
+    def update_cookies(self, cookies, response_url=aiohttp.cookiejar.URL()):
+        """Update cookies after a successful request"""
+        self.__cookie_jar.update_cookies(cookies, response_url=response_url)
+        if "_xsrf" in cookies:
+            self.__headers["X-XSRFToken"] = cookies["_xsrf"].value
 
     @property
     def headers(self):
